@@ -1,0 +1,8 @@
+gradio
+pandas
+rapidfuzz
+sentence-transformers
+faiss-cpu
+llama-cpp-python
+requests_html  # if your scraper uses it
+selenium      # if your scraper uses selenium
