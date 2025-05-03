@@ -2,7 +2,7 @@
 """
 main.py
 
-Single-page ALDI UK data scraper and shopping planner.
+ALDI UK Data Scraper & Shopping Planner
 """
 import os
 import subprocess
@@ -11,13 +11,11 @@ import json
 
 import pandas as pd
 import gradio as gr
-
-# RAG & LLM imports
 from sentence_transformers import SentenceTransformer
 import faiss
 from llama_cpp import Llama
 
-# Constants
+# --- Constants & Configurations ---
 CSV_PATH = "aldi_uk_groceries.csv"
 MODEL_ENV = "LLAMA_MODEL_PATH"
 DEFAULT_MODEL = (
@@ -25,26 +23,27 @@ DEFAULT_MODEL = (
     "Falcon3-3B-Instruct-GGUF/Falcon3-3B-Instruct-q4_0.gguf"
 )
 EMBED_MODEL_NAME = "all-MiniLM-L6-v2"
+PAGE_TIMEOUT = 10
+SCRAPER_SCRIPT = "scrape_aldi.py"
 
-# Globals for FAISS index
+# --- Globals for RAG ---
 embed_model = SentenceTransformer(EMBED_MODEL_NAME)
 index = None
 product_names = []
 
-
+# --- Utility Functions ---
 def load_catalog(path=CSV_PATH):
     """Load the product CSV and parse prices."""
     df = pd.read_csv(path)
     df["price_value"] = (
-        df["price"]
-          .str.replace(r"[^\d\.]", "", regex=True)
-          .astype(float)
+        df["price"].str.replace(r"[^\d\.]", "", regex=True)
+        .astype(float)
     )
     return df
 
 
 def rebuild_index(df):
-    """Build or rebuild the FAISS index from the DataFrame."""
+    """Construct the FAISS index for semantic retrieval."""
     global index, product_names
     product_names = df["name"].tolist()
     embeddings = embed_model.encode(product_names, show_progress_bar=False)
@@ -54,151 +53,117 @@ def rebuild_index(df):
 
 
 def initialize_llm():
-    """Initialize and return the local LLM client."""
+    """Initialize the LLM client from environment or default path."""
     model_path = os.environ.get(MODEL_ENV, DEFAULT_MODEL)
     return Llama(model_path=model_path, n_ctx=2048, n_threads=4)
 
-
+# --- Scraper Integration ---
 def scrape_data():
     """
-    Run the ALDI scraper script and rebuild the FAISS index.
-    Returns a status message.
+    Execute the external scraper script and rebuild the index.
     """
-    if not os.path.exists("scrape_aldi.py"):
-        return "Error: scrape_aldi.py not found."
-
-    result = subprocess.run(
-        ["python", "scrape_aldi.py"],
-        capture_output=True,
-        text=True
+    if not os.path.exists(SCRAPER_SCRIPT):
+        return "❌ `scrape_aldi.py` not found."
+    proc = subprocess.run(
+        ["python", SCRAPER_SCRIPT], capture_output=True, text=True
     )
-    if result.returncode != 0:
-        return f"❌ Scrape failed:\n{result.stderr.strip()}"
-
+    if proc.returncode != 0:
+        return f"❌ Scrape failed:\n{proc.stderr.strip()}"
     try:
         df = load_catalog()
         rebuild_index(df)
-        return f"✅ Scrape successful: {len(df)} products loaded."
+        return f"✅ Scrape complete: {len(df)} products loaded."
     except Exception as e:
-        return f"❌ Indexing error: {e}"
+        return f"❌ Index rebuild error: {e}"
 
-
+# --- Shopping Planner Logic ---
 def plan_shopping(shopping_list: str, budget: float, llm):
     """
-    Generate a shopping plan using RAG + LLM.
-    Returns a DataFrame and a summary message.
+    Use RAG + LLM to select items within budget.
     """
     df = load_catalog()
-    selection = []
+    results = []
     total = 0.0
 
-    for item in [i.strip() for i in shopping_list.split(",") if i.strip()]:
+    for item in filter(None, map(str.strip, shopping_list.split(','))):
         # Retrieve top-5 semantically similar products
-        q_emb = embed_model.encode([item])[0].astype("float32")
-        _, indices = index.search(q_emb.reshape(1, -1), 5)
-        raw_cands = [
-            {"name": product_names[idx], "price": df.loc[idx, "price_value"]}
-            for idx in indices[0]
+        emb = embed_model.encode([item])[0].astype("float32")
+        _, idxs = index.search(emb.reshape(1, -1), 5)
+        candidates = [
+            {"name": product_names[i], "price": df.loc[i, "price_value"]}
+            for i in idxs[0]
         ]
-        # Keyword filter
+        # Filter by keyword match
         tokens = set(re.findall(r"\w+", item.lower()))
-        filtered = [
-            c for c in raw_cands
-            if tokens & set(re.findall(r"\w+", c["name"].lower()))
-        ]
-        cands = filtered or raw_cands
-
-        # Prompt the LLM
+        filtered = [c for c in candidates if tokens & set(re.findall(r"\w+", c["name"].lower()))]
+        cands = filtered or candidates
+        # Prompt LLM
         remaining = budget - total
         prompt = (
             f"Budget remaining: £{remaining:.2f}\n"
-            f"User wants: {item}\n"
-            "Select best match from:\n"
+            f"Item: {item}\n"
+            "Choose the best match from the list below (name + price):\n"
         )
-        for c in cands:
-            prompt += f"- {c['name']} (£{c['price']:.2f})\n"
+        prompt += "\n".join(f"- {c['name']} (£{c['price']:.2f})" for c in cands)
         prompt += (
-            "Reply with JSON {\"selected\":<name>,\"price\":<price>} or OMIT."
+            "\nReturn JSON:{ 'selected':'<name>', 'price':<price> } or OMIT."
         )
-
         resp = llm(prompt=prompt, max_tokens=200)["choices"][0]["text"]
-        # Extract JSON
+        # Parse JSON
         try:
-            js = resp[resp.index("{"):resp.rindex("}")+1]
-            data = json.loads(js)
+            js = resp[resp.index('{'):resp.rindex('}')+1]
+            sel = json.loads(js)
         except Exception:
-            data = {}
-
-        if data.get("selected") and data["selected"] != "OMIT":
-            sel_name = data["selected"]
-            sel_price = float(
-                re.sub(r"[^\d\.]", "", str(data.get("price", "0")))
-            )
+            sel = {}
+        if sel.get('selected') and sel['selected'] != 'OMIT':
+            name = sel['selected']
+            price = float(re.sub(r"[^\d\.]", "", str(sel.get('price', 0))))
         else:
-            best = min(cands, key=lambda x: x["price"])
-            sel_name, sel_price = best["name"], best["price"]
-
-        selection.append({
-            "requested": item,
-            "selected": sel_name,
-            "price": round(sel_price, 2)
-        })
-        total += sel_price
-
-    # Final budget message
+            best = min(cands, key=lambda x: x['price'])
+            name, price = best['name'], best['price']
+        results.append({"requested": item, "selected": name, "price": round(price, 2)})
+        total += price
+    # Budget summary
     if total <= budget:
-        msg = f"✅ Total £{total:.2f} within £{budget:.2f}."
+        summary = f"✅ Total £{total:.2f} within £{budget:.2f}."
     elif total - budget <= 5:
-        msg = f"⚠️ Total £{total:.2f} slightly over £{budget:.2f}."
+        summary = f"⚠️ Total £{total:.2f} slightly over £{budget:.2f}."
     else:
-        msg = f"❌ Total £{total:.2f} exceeds £{budget:.2f}."
+        summary = f"❌ Total £{total:.2f} exceeds £{budget:.2f}."
+    return pd.DataFrame(results), summary
 
-    return pd.DataFrame(selection), msg
-
-
-def build_ui():
-    """Construct and return the Gradio interface."""
+# --- UI Construction ---
+def create_ui():
     llm = initialize_llm()
-    with gr.Blocks() as app:
-        gr.Markdown("# ALDI Scraper & Shopping Planner")
+    with gr.Blocks(title="ALDI UK Scraper & Planner", theme="default") as app:
+        gr.Markdown("# 🛒 ALDI UK Scraper & Shopping Planner")
 
-        with gr.Row():
-            scrape_btn = gr.Button("Run Scraper")
-            scrape_status = gr.Textbox(label="Status", interactive=False)
-        scrape_btn.click(scrape_data, outputs=[scrape_status])
+        with gr.Tab("Scrape Data"):
+            with gr.Row():
+                scrape_btn = gr.Button("Run Scraper", variant="primary")
+                scrape_out = gr.Textbox(label="Status", interactive=False)
+            scrape_btn.click(scrape_data, outputs=[scrape_out])
 
-        gr.Markdown("---")
-        gr.Markdown("## Plan Shopping")
-
-        shop_in = gr.Textbox(
-            label="Shopping List",
-            placeholder="e.g. sem-skimmed milk, houmous, fries"
-        )
-        budget_in = gr.Number(label="Budget (£)", value=20.0)
-        plan_btn = gr.Button("Plan Shopping")
-
-        out_tbl = gr.Dataframe(headers=["requested", "selected", "price"])
-        out_msg = gr.Textbox(label="Message", lines=3)
-
-        plan_btn.click(
-            lambda s, b: plan_shopping(s, b, llm),
-            inputs=[shop_in, budget_in],
-            outputs=[out_tbl, out_msg]
-        )
+        with gr.Tab("Plan Shopping"):
+            gr.Markdown("#### Enter your shopping list and budget below:")
+            with gr.Row():
+                list_in = gr.Textbox(label="Shopping List (comma-separated)")
+                budget_in = gr.Number(label="Budget (£)", value=20.0)
+            plan_btn = gr.Button("Plan Shopping", variant="primary")
+            table = gr.Dataframe(headers=["requested", "selected", "price"], label="Your Basket")
+            summary = gr.Markdown()
+            plan_btn.click(lambda l,b: plan_shopping(l,b,llm), inputs=[list_in,budget_in], outputs=[table,summary])
 
     return app
 
 
 def main():
-    # Build FAISS index if CSV exists
     if os.path.exists(CSV_PATH):
         df = load_catalog()
         rebuild_index(df)
-
-    app = build_ui()
-    app.launch()
+    ui = create_ui()
+    ui.launch()
 
 
 if __name__ == "__main__":
     main()
-
