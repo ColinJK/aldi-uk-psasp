@@ -28,6 +28,7 @@ Everything runs locally—your data never leaves your machine.
 </p>
 
 *Enter a shopping list & budget, then watch your AI-chosen basket appear.*
+
 ---
 
 ## 🚀 Quick Start
