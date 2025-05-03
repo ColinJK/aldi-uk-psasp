@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="banner.png" alt="ALDI UK Shop Planner Banner" width="800" />
+  <img src="banner.png" alt="ALDI UK Shop Planner Banner" width="450" />
 </p>
 
 # ALDI UK Shop Planner 🛍️
@@ -17,12 +17,17 @@ Everything runs locally—your data never leaves your machine.
 
 ## 📸 Screenshots
 
-![Scraper Tab](screenshot1.png)  
+<p align="center">
+  <img src="screenshot1.png" alt="Scraper Tab" width="800" />
+</p>
+
 *Run the scraper and see your product count instantly.*
 
-![Planner Tab](screenshot2.png)  
-*Enter a shopping list & budget, then watch your AI-chosen basket appear.*
+<p align="center">
+  <img src="screenshot2.png" alt="Planner Tab" width="800" />
+</p>
 
+*Enter a shopping list & budget, then watch your AI-chosen basket appear.*
 ---
 
 ## 🚀 Quick Start
@@ -31,7 +36,8 @@ Everything runs locally—your data never leaves your machine.
    ```bash
    git clone https://github.com/ColinJK/aldi-uk-psasp.git
    cd aldi-shop-planner
-````
+   ```
+
 
 2. **Create** and **activate** a virtual environment:
 
