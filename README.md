@@ -1,93 +1,102 @@
-# ALDI UK Price Scraper & Shopping Planner
+<p align="center">
+  <img src="banner.png" alt="ALDI UK Shop Planner Banner" width="800" />
+</p>
 
-A single‐page application to:
+# ALDI UK Shop Planner 🛍️
 
-1. **Scrape** ALDI UK grocery data into a CSV (`aldi_uk_groceries.csv`).
-2. **Plan** a budget‐aware shopping basket using Retrieval‐Augmented Generation (RAG) with a local LLM.
+> **Your AI-powered sidekick for ALDI UK groceries!**
+
+No more second-guessing prices or overspending at the till. With one click you can:
+
+1. **🍏 Scrape** the full ALDI UK catalogue into a CSV.  
+2. **🔍 Plan** a budget-friendly basket using a tiny, on-device LLM.
+
+Everything runs locally—your data never leaves your machine.
 
 ---
 
-## Prerequisites
+## 📸 Screenshots
 
-- **Python 3.8+** (tested on 3.10, 3.11, 3.13)
-- **Google Chrome** browser and matching **ChromeDriver** in your PATH
-- A **GGUF**-formatted LLM under **1 GB**, e.g. a quantized Mistral-1.1 B model (see below)
+![Scraper Tab](screenshot1.png)  
+*Run the scraper and see your product count instantly.*
+
+![Planner Tab](screenshot2.png)  
+*Enter a shopping list & budget, then watch your AI-chosen basket appear.*
 
 ---
 
-## Installation
+## 🚀 Quick Start
 
-1. **Clone** this repository:
+1. **Clone** this repo:
    ```bash
-   git clone https://github.com/yourusername/aldi-shop-planner.git
+   git clone https://github.com/ColinJK/aldi-uk-psasp.git
    cd aldi-shop-planner
-   ```
+````
 
 2. **Create** and **activate** a virtual environment:
+
    ```bash
    python -m venv .venv
    source .venv/bin/activate    # macOS/Linux
-   .\.venv\Scripts\activate   # Windows PowerShell
+   .\.venv\Scripts\activate     # Windows PowerShell
    ```
 
-3. **Install** Python dependencies:
+3. **Install** dependencies:
+
    ```bash
    pip install --upgrade pip
    pip install -r requirements.txt
    ```
 
-4. **Download** a compact GGUF model (<1 GB). Recommended:
+4. **Download** a compact GGUF model (<1 GB) from our recommendations below.
 
-   | Model                                     | Size   | Format       | URL                                                                                  |
-   |-------------------------------------------|--------|--------------|--------------------------------------------------------------------------------------|
-   | tensorblock/mistral-1.1b-testing-GGUF     | 0.62 GB| Q4_K_M (4-bit)| https://huggingface.co/tensorblock/mistral-1.1b-testing-GGUF                          |
-   | afrideva/malaysian-mistral-1.1B-4096-GGUF| 0.68 GB| Q4_K_M (4-bit)| https://huggingface.co/afrideva/malaysian-mistral-1.1B-4096-GGUF                     |
+5. **Point** the app at your model:
 
-5. **Set** the model path environment variable (replace with your path):
    ```bash
-   export LLAMA_MODEL_PATH="/home/user/models/mistral-1.1b-testing-Q4_K_M.gguf"  # Linux/macOS
-   setx LLAMA_MODEL_PATH "C:\Models\mistral-1.1b-testing-Q4_K_M.gguf"        # Windows
+   export LLAMA_MODEL_PATH="/path/to/your/model.gguf"   # macOS/Linux
+   setx LLAMA_MODEL_PATH "C:\Models\your_model.gguf"    # Windows
    ```
 
----
+6. **Launch** the app:
 
-## Usage
+   ```bash
+   python main.py
+   ```
 
-Run the main application:
-```bash
-python main.py
-```
-
-This will open a web UI at `http://127.0.0.1:7860`:
-
-1. **Run Scraper**: Click the button to execute `scrape_aldi.py`. A status message shows scrape success and product count.
-2. **Plan Shopping**:
-   - Enter your shopping list as comma‑separated items (e.g. `sem-skimmed milk, irish sausages, houmous`).
-   - Specify your budget (e.g. `20.00`).
-   - Click **Plan Shopping**. The planner uses RAG + LLM to match items, then displays your basket and a summary.
+   Then open 👉 [http://127.0.0.1:7860](http://127.0.0.1:7860) in your browser.
 
 ---
 
-## File Structure
+## 💚 Model Picks (<1 GB)
 
-```text
-aldi-shop-planner/
-├── main.py               # App combining scraper button + planner UI
-├── scrape_aldi.py        # Headless Chrome scraper for ALDI UK groceries
-├── requirements.txt      # Python dependencies
-└── README.md             # This documentation
-```
+| Model                                                | Size    | Link                                                                                                                                 |
+| ---------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| **tensorblock/mistral-1.1b-testing-GGUF (Q4\_K\_M)** | 0.62 GB | [https://huggingface.co/tensorblock/mistral-1.1b-testing-GGUF](https://huggingface.co/tensorblock/mistral-1.1b-testing-GGUF)         |
+| **afrideva/malaysian-mistral-1.1B-4096-GGUF**        | 0.68 GB | [https://huggingface.co/afrideva/malaysian-mistral-1.1B-4096-GGUF](https://huggingface.co/afrideva/malaysian-mistral-1.1B-4096-GGUF) |
 
 ---
 
-## Troubleshooting
+## 🎯 What’s Inside?
 
-- **ChromeDriver errors**: Make sure your ChromeDriver version matches your installed Chrome.
-- **Model load failures**: Verify `LLAMA_MODEL_PATH` points to a valid `.gguf` file.
-- **Missing packages**: Re-run `pip install -r requirements.txt`.
+* **main.py**         – One-page Gradio app with two tabs:
+
+  * **Scrape Data**: runs `scrape_aldi.py` via Selenium.
+  * **Plan Shopping**: uses RAG + LLM to pick your basket.
+* **scrape\_aldi.py**  – Headless-Chrome scraper exporting `aldi_uk_groceries.csv`.
+* **requirements.txt** – All necessary Python packages.
 
 ---
 
-## License
+## ⚙️ Tips & Tricks
 
+* **ChromeDriver**: Ensure your ChromeDriver version matches Chrome.
+* **Model Path**: Double-check `LLAMA_MODEL_PATH` if you see load errors.
+* **Budget Alerts**: Green ✅ under budget, ⚠️ slightly over, ❌ well over.
+
+---
+
+## 🤝 Contributing & License
+
+Pull requests and ⭐️ are welcome!
 MIT © Colin Kidwell
+
